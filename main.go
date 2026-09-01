@@ -65,11 +65,15 @@ func SeedUsers() {
 		}
 		
 		users := []User{
-			{Username: "superadmin", PasswordHash: hashedPassword, Role: "Super Admin"},
+			{Username: "superadmin", PasswordHash: hashedPassword, Role: "Super Admin IT"},
 			{Username: "infra_admin", PasswordHash: hashedPassword, Role: "IT Infrastructure Admin"},
 			{Username: "it_support", PasswordHash: hashedPassword, Role: "IT Support"},
 			{Username: "net_admin", PasswordHash: hashedPassword, Role: "Network Admin"},
-			{Username: "security_jaga", PasswordHash: hashedPassword, Role: "Security"},
+			{Username: "facility_eng", PasswordHash: hashedPassword, Role: "Facility/Engineering"},
+			{Username: "security_jaga", PasswordHash: hashedPassword, Role: "Security/Petugas Jaga"},
+			{Username: "manajemen", PasswordHash: hashedPassword, Role: "Manajemen"},
+			{Username: "auditor", PasswordHash: hashedPassword, Role: "Auditor/Internal Control"},
+			{Username: "viewer", PasswordHash: hashedPassword, Role: "Viewer"},
 		}
 		
 		DB.Create(&users)
