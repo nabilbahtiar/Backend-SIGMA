@@ -28,6 +28,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// Simpan ke context agar Audit Logger tahu siapa yang mencoba login
+	c.Set("attempted_username", req.Username)
+
 	token, role, err := h.authService.Login(req.Username, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
@@ -35,7 +38,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Login Berhasil",
+		"message": "Login berhasil",
 		"token":   token,
 		"user": gin.H{
 			"username": req.Username,

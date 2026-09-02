@@ -4,35 +4,80 @@ import (
 	"log"
 	"time"
 
+	"server-room-auth/internal/model"
+	"server-room-auth/pkg/database"
+
 	"github.com/gin-gonic/gin"
 )
 
-// AuditLogger mencatat setiap request API ke konsol (siap dialihkan ke file/DB)
+// AuditLogger mencatat setiap request API ke database dan terminal
 func AuditLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
 
-		// Proses request
+		// Proses request terlebih dahulu
 		c.Next()
 
-		// Catat setelah request selesai
-		latency := time.Since(startTime)
+		// Kumpulkan data setelah request selesai diproses
+		latency := time.Since(startTime).String()
 		statusCode := c.Writer.Status()
 		clientIP := c.ClientIP()
 		method := c.Request.Method
 		path := c.Request.URL.Path
+		userAgent := c.Request.UserAgent()
+		if userAgent == "" {
+			userAgent = "Unknown Client"
+		}
 
-		log.Printf("[AUDIT] %s | %3d | %13v | %-7s | %s",
-			time.Now().Format("2006/01/02 - 15:04:05"),
+		// Cari tahu siapa pelakunya (Username)
+		username := "Guest"
+		if val, exists := c.Get("username"); exists {
+			username = val.(string) // Didapat dari JWT jika akses rute terproteksi
+		} else if val, exists := c.Get("attempted_username"); exists {
+			username = val.(string) // Didapat dari body JSON jika mencoba login
+		}
+
+		// Tentukan aksi (Action/Deskripsi singkat)
+		action := "API Access"
+		if path == "/api/login" {
+			if statusCode == 200 {
+				action = "Login Success"
+			} else {
+				action = "Login Failed"
+			}
+		} else if statusCode == 403 {
+			action = "Access Denied (RBAC Block)"
+		}
+
+		// 1. Catat ke Terminal
+		log.Printf("[AUDIT] %s | %3d | %10s | %-6s | %s | User: %s",
+			time.Now().Format("15:04:05"),
 			statusCode,
 			latency,
 			method,
 			path,
+			username,
 		)
-
-		// Catat percobaan login gagal sebagai peringatan
-		if path == "/api/login" && statusCode == 401 {
-			log.Printf("[SECURITY WARNING] Login gagal dari IP: %s | Path: %s", clientIP, path)
+		if action == "Login Failed" {
+			log.Printf("[SECURITY WARNING] Login gagal dari IP: %s (User: %s)", clientIP, username)
 		}
+
+		// 2. Simpan ke Database
+		audit := model.AuditLog{
+			Timestamp:  startTime,
+			Username:   username,
+			Action:     action,
+			Method:     method,
+			Path:       path,
+			StatusCode: statusCode,
+			ClientIP:   clientIP,
+			UserAgent:  userAgent,
+			Latency:    latency,
+		}
+		
+		// Gunakan go-routine agar penyimpanan ke database tidak membuat response API menjadi lambat
+		go func(logData model.AuditLog) {
+			database.DB.Create(&logData)
+		}(audit)
 	}
 }

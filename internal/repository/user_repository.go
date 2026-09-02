@@ -19,3 +19,7 @@ func (r *UserRepository) FindByUsername(username string) (*model.User, error) {
 	}
 	return &user, nil
 }
+
+func (r *UserRepository) UpdateUser(user *model.User) error {
+	return database.DB.Save(user).Error
+}

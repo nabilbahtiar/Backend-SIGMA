@@ -29,8 +29,8 @@ func InitDB() {
 		log.Fatalf("Gagal terhubung ke database: %v", err)
 	}
 
-	DB.AutoMigrate(&model.User{})
-	fmt.Println("Koneksi database berhasil!")
+	DB.AutoMigrate(&model.User{}, &model.AuditLog{})
+	fmt.Println("Koneksi database berhasil dan tabel telah diverifikasi!")
 
 	SeedUsers()
 }
