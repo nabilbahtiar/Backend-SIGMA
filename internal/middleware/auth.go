@@ -35,7 +35,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		// Simpan claims di context
-		c.Set("username", claims["username"])
+		c.Set("nik", claims["nik"])
 		c.Set("role", claims["role"])
 
 		c.Next()

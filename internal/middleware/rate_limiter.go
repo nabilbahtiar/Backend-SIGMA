@@ -1,6 +1,9 @@
 package middleware
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -15,23 +18,48 @@ type IPBanState struct {
 }
 
 var (
+	// ipBans sekarang menggunakan kombinasi "IP_NIK" sebagai key
 	ipBans = make(map[string]*IPBanState)
 	banMu  sync.Mutex
 )
 
-// LoginRateLimiter memblokir IP yang gagal login 3x dengan skema waktu bertingkat (5m, 10m, 20m, dst)
+// LoginRateLimiter memblokir IP+NIK yang gagal login 3x dengan skema waktu bertingkat (5m, 10m, 20m, dst)
 func LoginRateLimiter() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
+		var nik string
 
-		banMu.Lock()
-		state, exists := ipBans[ip]
-		if !exists {
-			state = &IPBanState{}
-			ipBans[ip] = state
+		// 1. Baca Body JSON untuk mendapatkan NIK
+		// Karena body adalah stream, kita harus meng-copy isinya agar handler nanti tetap bisa membacanya
+		if c.Request.Body != nil {
+			bodyBytes, _ := io.ReadAll(c.Request.Body)
+			c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // Kembalikan isi body seperti semula
+
+			var req struct {
+				NIK string `json:"nik"`
+			}
+			if err := json.Unmarshal(bodyBytes, &req); err == nil {
+				nik = req.NIK
+			}
 		}
 
-		// 1. Cek apakah IP ini sedang dihukum
+		// Jika NIK tidak ditemukan, biarkan handler yang menolaknya nanti
+		if nik == "" {
+			c.Next()
+			return
+		}
+
+		// Kunci pelacakan adalah IP_NIK (Contoh: 192.168.1.1_102.402.322)
+		trackingKey := ip + "_" + nik
+
+		banMu.Lock()
+		state, exists := ipBans[trackingKey]
+		if !exists {
+			state = &IPBanState{}
+			ipBans[trackingKey] = state
+		}
+
+		// 2. Cek apakah kombinasi IP & NIK ini sedang dihukum
 		if time.Now().Before(state.BannedUntil) {
 			remainingSeconds := int(time.Until(state.BannedUntil).Seconds())
 			banMu.Unlock()
@@ -39,7 +67,7 @@ func LoginRateLimiter() gin.HandlerFunc {
 				remainingSeconds = 1
 			}
 			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":                "Terlalu banyak percobaan gagal. Silakan coba lagi nanti.",
+				"error":               "Terlalu banyak percobaan gagal pada NIK ini. Silakan coba lagi nanti.",
 				"retry_after_seconds": remainingSeconds,
 			})
 			c.Abort()
@@ -47,10 +75,10 @@ func LoginRateLimiter() gin.HandlerFunc {
 		}
 		banMu.Unlock()
 
-		// 2. Lanjutkan request ke Auth Handler
+		// 3. Lanjutkan request ke Auth Handler
 		c.Next()
 
-		// 3. Evaluasi hasil request (setelah Handler selesai memproses password)
+		// 4. Evaluasi hasil request
 		status := c.Writer.Status()
 
 		banMu.Lock()
@@ -63,18 +91,17 @@ func LoginRateLimiter() gin.HandlerFunc {
 
 			if state.FailCount >= 3 {
 				state.BanCount++ // Tingkatkan level hukuman
-				
+
 				// Hitung masa hukuman (5 menit * 2^(BanCount-1))
-				// Ban 1 = 5m, Ban 2 = 10m, Ban 3 = 20m
-				multiplier := 1 << uint(state.BanCount - 1) 
-				banDuration := time.Duration(5 * multiplier) * time.Minute
-				
+				multiplier := 1 << uint(state.BanCount-1)
+				banDuration := time.Duration(5*multiplier) * time.Minute
+
 				state.BannedUntil = time.Now().Add(banDuration)
 				state.FailCount = 0 // Reset hitungan kegagalan untuk masa depan
 			}
 		case http.StatusOK:
-			// Jika login berhasil, hapus semua catatan buruk untuk IP ini
-			delete(ipBans, ip)
+			// Jika login berhasil, hapus semua catatan buruk untuk kombinasi IP+NIK ini
+			delete(ipBans, trackingKey)
 		}
 	}
 }

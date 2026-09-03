@@ -16,11 +16,11 @@ func NewAuthService(repo *repository.UserRepository) *AuthService {
 	return &AuthService{userRepo: repo}
 }
 
-func (s *AuthService) Login(username, password string) (string, string, error) {
-	// 1. Cek username
-	user, err := s.userRepo.FindByUsername(username)
+func (s *AuthService) Login(nik, password string) (string, string, error) {
+	// 1. Cek NIK
+	user, err := s.userRepo.FindByNIK(nik)
 	if err != nil {
-		return "", "", errors.New("Username yang anda masukkan tidak terdaftar")
+		return "", "", errors.New("NIK yang anda masukkan tidak terdaftar")
 	}
 
 	// 2. Cek password
@@ -29,7 +29,7 @@ func (s *AuthService) Login(username, password string) (string, string, error) {
 	}
 
 	// 3. Generate Token
-	token, err := jwt.GenerateJWT(user.Username, user.Role)
+	token, err := jwt.GenerateJWT(user.NIK, user.Role)
 	if err != nil {
 		return "", "", errors.New("Gagal menghasilkan token sesi")
 	}

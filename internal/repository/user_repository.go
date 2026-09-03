@@ -11,9 +11,9 @@ func NewUserRepository() *UserRepository {
 	return &UserRepository{}
 }
 
-func (r *UserRepository) FindByUsername(username string) (*model.User, error) {
+func (r *UserRepository) FindByNIK(nik string) (*model.User, error) {
 	var user model.User
-	err := database.DB.Where("username = ?", username).First(&user).Error
+	err := database.DB.Where("nik = ?", nik).First(&user).Error
 	if err != nil {
 		return nil, err
 	}

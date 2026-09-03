@@ -10,7 +10,12 @@ import (
 // User merepresentasikan tabel users di database
 type User struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	Username     string    `gorm:"uniqueIndex;not null" json:"username"`
+	NIK          string    `gorm:"uniqueIndex;not null" json:"nik"`
+	Nama         string    `gorm:"not null" json:"nama"`
+	Jabatan      string    `gorm:"not null" json:"jabatan"`
+	Unit         string    `gorm:"not null" json:"unit"`
+	TipePegawai  string    `gorm:"not null" json:"tipe_pegawai"`
+	NoHP         string    `gorm:"not null" json:"no_hp"`
 	PasswordHash string    `gorm:"not null" json:"-"` // Tidak dikirim ke klien
 	Role         string    `gorm:"not null" json:"role"`
 	CreatedAt    time.Time `json:"created_at"`

@@ -17,21 +17,21 @@ func NewAuthHandler(service *service.AuthService) *AuthHandler {
 }
 
 type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
+	NIK      string `json:"nik" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Format request tidak valid (username dan password wajib diisi)"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format request tidak valid (nik dan password wajib diisi)"})
 		return
 	}
 
-	// Simpan ke context agar Audit Logger tahu siapa yang mencoba login
-	c.Set("attempted_username", req.Username)
+	// Simpan ke context agar Logger atau Rate Limiter punya info tambahan
+	c.Set("attempted_nik", req.NIK)
 
-	token, role, err := h.authService.Login(req.Username, req.Password)
+	token, role, err := h.authService.Login(req.NIK, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -41,8 +41,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		"message": "Login berhasil",
 		"token":   token,
 		"user": gin.H{
-			"username": req.Username,
-			"role":     role,
+			"nik":  req.NIK,
+			"role": role,
 		},
 	})
 }
