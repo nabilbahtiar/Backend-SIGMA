@@ -41,6 +41,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		"message": "Login berhasil",
 		"token":   token,
 		"user": gin.H{
+			"id":          user.ID,
 			"nik":         user.GetNIK(),
 			"nama":        user.Nama,
 			"role":        user.Role,

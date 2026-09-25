@@ -40,7 +40,7 @@ func SetupRouter(authHandler *handler.AuthHandler, sensorHandler *handler.Sensor
 	// ==============================
 	api := r.Group("/api")
 	{
-		// Rate Limiter: login NIK & Password (anti brute-force)
+		// Rate Limiter: memblokir NIK/IP jika 3x gagal login
 		api.POST("/login", middleware.LoginRateLimiter(), authHandler.Login)
 	}
 

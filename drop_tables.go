@@ -45,13 +45,5 @@ func main() {
 	database.SeedUsers()
 	database.SeedSensors()
 
-	// Tampilkan data Abdul Wahab dan Guest untuk verifikasi
-	var wahab model.User
-	database.DB.Where("nik = ?", "52.002.223").First(&wahab)
-	fmt.Printf("[Verifikasi 1] Abdul Wahab: NIK=%s, Role=%s\n", wahab.GetNIK(), wahab.Role)
-
-	var guest model.User
-	database.DB.Where("role = ?", "Guest").First(&guest)
-	nikVal := guest.NIK
-	fmt.Printf("[Verifikasi 2] Guest: NIK=%s, PasswordHash='%s', Role=%s\n", nikVal, guest.PasswordHash, guest.Role)
+	fmt.Println("Proses Reset Pabrik & Seeder Selesai 100%!")
 }
