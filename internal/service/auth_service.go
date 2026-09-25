@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 
+	"server-room-auth/internal/model"
 	"server-room-auth/internal/repository"
 	"server-room-auth/pkg/jwt"
 	"server-room-auth/pkg/utils"
@@ -16,23 +17,23 @@ func NewAuthService(repo *repository.UserRepository) *AuthService {
 	return &AuthService{userRepo: repo}
 }
 
-func (s *AuthService) Login(nik, password string) (string, string, error) {
+func (s *AuthService) Login(nik, password string) (string, *model.User, error) {
 	// 1. Cek NIK
 	user, err := s.userRepo.FindByNIK(nik)
 	if err != nil {
-		return "", "", errors.New("NIK yang anda masukkan tidak terdaftar")
+		return "", nil, errors.New("NIK yang anda masukkan tidak terdaftar")
 	}
 
 	// 2. Cek password
 	if !utils.CheckPasswordHash(password, user.PasswordHash) {
-		return "", "", errors.New("Password yang anda masukkan salah")
+		return "", nil, errors.New("Password yang anda masukkan salah")
 	}
 
 	// 3. Generate Token
 	token, err := jwt.GenerateJWT(user.NIK, user.Role)
 	if err != nil {
-		return "", "", errors.New("Gagal menghasilkan token sesi")
+		return "", nil, errors.New("Gagal menghasilkan token sesi")
 	}
 
-	return token, user.Role, nil
+	return token, user, nil
 }

@@ -31,7 +31,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// Simpan ke context agar Logger atau Rate Limiter punya info tambahan
 	c.Set("attempted_nik", req.NIK)
 
-	token, role, err := h.authService.Login(req.NIK, req.Password)
+	token, user, err := h.authService.Login(req.NIK, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -41,8 +41,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		"message": "Login berhasil",
 		"token":   token,
 		"user": gin.H{
-			"nik":  req.NIK,
-			"role": role,
+			"id":      user.ID,
+			"nik":     user.NIK,
+			"nama":    user.Nama,
+			"role":    user.Role,
+			"jabatan": user.Jabatan,
+			"unit":    user.Unit,
 		},
 	})
 }
