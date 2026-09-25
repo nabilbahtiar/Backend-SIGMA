@@ -21,7 +21,7 @@ func InitJWTSecret(secret string) {
 }
 
 // GenerateJWT menghasilkan token JWT yang aman dengan claims standar
-func GenerateJWT(username, role string) (string, error) {
+func GenerateJWT(nik, role string) (string, error) {
 	now := time.Now()
 	claims := jwt.MapClaims{
 		// Standard Claims
@@ -32,8 +32,8 @@ func GenerateJWT(username, role string) (string, error) {
 		"nbf": now.Unix(),                           // Not Before: token tidak valid sebelum waktu ini
 
 		// Custom Claims (data aplikasi)
-		"username": username,
-		"role":     role,
+		"nik":  nik,
+		"role": role,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
