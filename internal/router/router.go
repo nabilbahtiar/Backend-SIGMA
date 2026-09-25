@@ -40,7 +40,7 @@ func SetupRouter(authHandler *handler.AuthHandler) *gin.Engine {
 	// ==============================
 	api := r.Group("/api")
 	{
-		// Rate Limiter: maks 5 percobaan login per menit per IP (anti brute-force)
+		// Rate Limiter: memblokir NIK/IP jika 3x gagal login
 		api.POST("/login", middleware.LoginRateLimiter(), authHandler.Login)
 	}
 
@@ -52,17 +52,17 @@ func SetupRouter(authHandler *handler.AuthHandler) *gin.Engine {
 	{
 		// Semua role terautentikasi bisa akses status
 		secure.GET("/dashboard/status", func(c *gin.Context) {
-			username, _ := c.Get("username")
+			nik, _ := c.Get("nik")
 			role, _ := c.Get("role")
 			c.JSON(http.StatusOK, gin.H{
 				"success": true,
-				"message": fmt.Sprintf("Halo %v (%v), sistem IoT normal.", username, role),
+				"message": fmt.Sprintf("Halo NIK %v (%v), sistem IoT normal.", nik, role),
 			})
 		})
 
 		// RBAC: Hanya Super Admin IT & IT Infrastructure Admin (konfigurasi sensor)
 		adminOnly := secure.Group("/sensor")
-		adminOnly.Use(middleware.RoleMiddleware("Super Admin IT", "IT Infrastructure Admin"))
+		adminOnly.Use(middleware.RoleMiddleware("Super Admin IT", "IT Infrastructure Admin", "Superadmin"))
 		{
 			adminOnly.POST("/config", func(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{
@@ -74,9 +74,9 @@ func SetupRouter(authHandler *handler.AuthHandler) *gin.Engine {
 
 		// RBAC: Admin + IT Support + Network Admin bisa lihat data monitoring
 		monitorRoles := []string{
-			"Super Admin IT", "IT Infrastructure Admin",
-			"IT Support", "Network Admin",
-			"Facility/Engineering", "Security/Petugas Jaga",
+			"Super Admin IT", "IT Infrastructure Admin", "Superadmin",
+			"IT Support", "Network Admin", "Petugas TIK",
+			"Facility/Engineering", "Security/Petugas Jaga", "Petugas Jaga Keamanan",
 		}
 		monitor := secure.Group("/monitoring")
 		monitor.Use(middleware.RoleMiddleware(monitorRoles...))
@@ -91,8 +91,8 @@ func SetupRouter(authHandler *handler.AuthHandler) *gin.Engine {
 
 		// RBAC: Manajemen & Auditor hanya bisa lihat laporan (read-only)
 		reportRoles := []string{
-			"Super Admin IT", "Manajemen",
-			"Auditor/Internal Control", "IT Infrastructure Admin",
+			"Super Admin IT", "Manajemen", "Management",
+			"Auditor/Internal Control", "IT Infrastructure Admin", "Superadmin",
 		}
 		report := secure.Group("/report")
 		report.Use(middleware.RoleMiddleware(reportRoles...))
