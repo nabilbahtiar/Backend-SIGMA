@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter(authHandler *handler.AuthHandler) *gin.Engine {
+func SetupRouter(authHandler *handler.AuthHandler, sensorHandler *handler.SensorHandler) *gin.Engine {
 	// Gunakan gin.New() agar kita kontrol penuh semua middleware
 	r := gin.New()
 
@@ -40,31 +40,49 @@ func SetupRouter(authHandler *handler.AuthHandler) *gin.Engine {
 	// ==============================
 	api := r.Group("/api")
 	{
-		// Rate Limiter: maks 5 percobaan login per menit per IP (anti brute-force)
+		// Rate Limiter: login NIK & Password (anti brute-force)
 		api.POST("/login", middleware.LoginRateLimiter(), authHandler.Login)
 	}
 
 	// ==============================
 	// Rute Terproteksi (Wajib JWT valid)
+	// Matriks Hak Akses sesuai PDF Role Matrix:
+	// 1. Super Admin IT
+	// 2. IT Support
+	// 3. Facility/Engineering
+	// 4. Security
+	// 5. Manajemen
+	// 6. Guest
 	// ==============================
 	secure := api.Group("/secure")
 	secure.Use(middleware.AuthMiddleware())
 	{
-		// Semua role terautentikasi bisa akses status
-		secure.GET("/dashboard/status", func(c *gin.Context) {
-			username, _ := c.Get("username")
-			role, _ := c.Get("role")
-			c.JSON(http.StatusOK, gin.H{
-				"success": true,
-				"message": fmt.Sprintf("Halo %v (%v), sistem IoT normal.", username, role),
-			})
-		})
-
-		// RBAC: Hanya Super Admin IT & IT Infrastructure Admin (konfigurasi sensor)
-		adminOnly := secure.Group("/sensor")
-		adminOnly.Use(middleware.RoleMiddleware("Super Admin IT", "IT Infrastructure Admin"))
+		// 1. Dashboard (Semua 6 role memiliki akses)
+		dashboardRoles := []string{
+			"Super Admin IT", "IT Support", "Facility/Engineering", "Security", "Manajemen", "Guest",
+		}
+		dashboard := secure.Group("/dashboard")
+		dashboard.Use(middleware.RoleMiddleware(dashboardRoles...))
 		{
-			adminOnly.POST("/config", func(c *gin.Context) {
+			dashboard.GET("/status", func(c *gin.Context) {
+				nik, _ := c.Get("nik")
+				role, _ := c.Get("role")
+				c.JSON(http.StatusOK, gin.H{
+					"success": true,
+					"message": fmt.Sprintf("Halo %v (%v), status dashboard sistem IoT normal.", nik, role),
+				})
+			})
+			dashboard.GET("/sensors", sensorHandler.GetDashboardSensors)
+		}
+
+		// 2. Sensor / Config (Hanya Super Admin IT, IT Support, Facility/Engineering)
+		sensorRoles := []string{
+			"Super Admin IT", "IT Support", "Facility/Engineering",
+		}
+		sensorConfig := secure.Group("/sensor")
+		sensorConfig.Use(middleware.RoleMiddleware(sensorRoles...))
+		{
+			sensorConfig.POST("/config", func(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{
 					"success": true,
 					"message": "Konfigurasi sensor berhasil diperbarui",
@@ -72,35 +90,73 @@ func SetupRouter(authHandler *handler.AuthHandler) *gin.Engine {
 			})
 		}
 
-		// RBAC: Admin + IT Support + Network Admin bisa lihat data monitoring
-		monitorRoles := []string{
-			"Super Admin IT", "IT Infrastructure Admin",
-			"IT Support", "Network Admin",
-			"Facility/Engineering", "Security/Petugas Jaga",
+		// 3. Alarm (Semua 6 role: Super Admin IT, IT Support, Facility/Engineering, Security, Manajemen, Guest)
+		alarmRoles := []string{
+			"Super Admin IT", "IT Support", "Facility/Engineering", "Security", "Manajemen", "Guest",
 		}
-		monitor := secure.Group("/monitoring")
-		monitor.Use(middleware.RoleMiddleware(monitorRoles...))
+		alarmGroup := secure.Group("/alarm")
+		alarmGroup.Use(middleware.RoleMiddleware(alarmRoles...))
 		{
-			monitor.GET("/sensor/data", func(c *gin.Context) {
+			alarmGroup.GET("/list", func(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{
 					"success": true,
-					"message": "Data sensor berhasil diambil (endpoint placeholder)",
+					"message": "Daftar alarm/peringatan berhasil dimuat",
 				})
 			})
 		}
 
-		// RBAC: Manajemen & Auditor hanya bisa lihat laporan (read-only)
-		reportRoles := []string{
-			"Super Admin IT", "Manajemen",
-			"Auditor/Internal Control", "IT Infrastructure Admin",
+		// 4. User / RBAC (Hanya Super Admin IT)
+		userRbacRoles := []string{
+			"Super Admin IT",
 		}
+		userGroup := secure.Group("/users")
+		userGroup.Use(middleware.RoleMiddleware(userRbacRoles...))
+		{
+			userGroup.GET("", func(c *gin.Context) {
+				c.JSON(http.StatusOK, gin.H{
+					"success": true,
+					"message": "Data pengguna & RBAC berhasil dimuat (Super Admin IT only)",
+				})
+			})
+		}
+
+		// 5. Report & Monitoring (Semua 6 role)
+		reportRoles := []string{
+			"Super Admin IT", "IT Support", "Facility/Engineering", "Security", "Manajemen", "Guest",
+		}
+		monitor := secure.Group("/monitoring")
+		monitor.Use(middleware.RoleMiddleware(reportRoles...))
+		{
+			monitor.GET("/sensor/data", func(c *gin.Context) {
+				c.JSON(http.StatusOK, gin.H{
+					"success": true,
+					"message": "Data pemantauan sensor berhasil diambil",
+				})
+			})
+		}
+
 		report := secure.Group("/report")
 		report.Use(middleware.RoleMiddleware(reportRoles...))
 		{
 			report.GET("/summary", func(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{
 					"success": true,
-					"message": "Laporan berhasil diambil (endpoint placeholder)",
+					"message": "Ringkasan laporan berhasil diambil",
+				})
+			})
+		}
+
+		// 6. Helpdesk (Super Admin IT, IT Support, Facility/Engineering, Security)
+		helpdeskRoles := []string{
+			"Super Admin IT", "IT Support", "Facility/Engineering", "Security",
+		}
+		helpdesk := secure.Group("/helpdesk")
+		helpdesk.Use(middleware.RoleMiddleware(helpdeskRoles...))
+		{
+			helpdesk.GET("/tickets", func(c *gin.Context) {
+				c.JSON(http.StatusOK, gin.H{
+					"success": true,
+					"message": "Data tiket helpdesk berhasil dimuat",
 				})
 			})
 		}

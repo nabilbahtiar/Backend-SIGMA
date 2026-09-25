@@ -20,6 +20,15 @@ func (r *UserRepository) FindByNIK(nik string) (*model.User, error) {
 	return &user, nil
 }
 
+func (r *UserRepository) FindByRole(role string) (*model.User, error) {
+	var user model.User
+	err := database.DB.Where("role = ?", role).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (r *UserRepository) UpdateUser(user *model.User) error {
 	return database.DB.Save(user).Error
 }
